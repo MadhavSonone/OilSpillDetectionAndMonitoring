@@ -1,99 +1,100 @@
-mvnw.cmd spring-boot:run  # Windows  # Project Base for Vaadin and Spring Boot
+# 🚢 Vessel Monitoring & Oil Spill Detection System 🌊  
 
-This project can be used as a starting point to create your own Vaadin application with Spring Boot.
-It contains all the necessary configuration and some placeholder files to get you started.
+## 📌 Project Overview  
+This project is designed to track vessels in real-time using **AIS (Automatic Identification System) data** and visualize them on a **map-based UI**. Additionally, it provides an interface for **collecting AIS data, analyzing images, and detecting oil spill regions**.  
 
-The best way to create your own project based on this starter is [start.vaadin.com](https://start.vaadin.com/) - you can get only the necessary parts and choose the package naming you want to use.
+The backend is built with **Spring Boot**, while the frontend is developed using **Vaadin** for an interactive UI. **Apache Spark or Apache Storm** is used for handling large-scale AIS data efficiently. The **map-based interface** utilizes **OpenLayers** for seamless visualization.  
 
-## Running the Application
-There are two ways to run the application :  using `mvn spring-boot:run` or by running the `Application` class directly from your IDE.
+---
 
-You can use any IDE of your preference,but we suggest Eclipse or Intellij IDEA.
-Below are the configuration details to start the project using a `spring-boot:run` command. Both Eclipse and Intellij IDEA are covered.
+## 🛠️ Features  
+✅ **User Authentication** – Secure login and logout functionality.  
+✅ **Interactive Dashboard** – A home page displaying key metrics.  
+✅ **Vessel Tracking Map** – Real-time vessel location tracking using AIS data on OpenLayers.  
+✅ **AIS Data Collection** – UI for collecting and storing vessel movement data.  
+✅ **Oil Spill Detection** – Image processing tools to detect oil spills from satellite images.  
 
-#### Eclipse
-- Right click on a project folder and select `Run As` --> `Maven build..` . After that a configuration window is opened.
-- In the window set the value of the **Goals** field to `spring-boot:run` 
-- You can optionally select `Skip tests` checkbox
-- All the other settings can be left to default
+---
 
-Once configurations are set clicking `Run` will start the application
+## 📌 Tech Stack & Dependencies  
 
-#### Intellij IDEA
-- On the right side of the window, select Maven --> Plugins--> `spring-boot` --> `spring-boot:run` goal
-- Optionally, you can disable tests by clicking on a `Skip Tests mode` blue button.
+### **Backend:**  
+- **Spring Boot** – REST API, backend logic, authentication  
+- **Apache Spark / Apache Storm** – Big data processing for AIS data  
+- **Spring Security** – Authentication and authorization  
 
-Clicking on the green run button will start the application.
+### **Frontend (Vaadin-based UI):**  
+- **Vaadin** – UI framework for building web applications  
+- **OpenLayers** – Map visualization for tracking vessels  
+- **Java 17+** – Required for Vaadin and Spring Boot  
 
-After the application has started, you can view your it at http://localhost:8080/ in your browser.
+### **Tools & Libraries:**  
+- **Maven** – Dependency management  
+- **Docker** *(optional)* – Containerized deployment  
+- **Eclipse / IntelliJ IDEA** – IDE for development  
 
+---
 
-If you want to run the application locally in the production mode, use `spring-boot:run -Pproduction` command instead.
-### Running Integration Tests
+## ⚡ How to Run the Project  
 
-Integration tests are implemented using [Vaadin TestBench](https://vaadin.com/testbench). The tests take a few minutes to run and are therefore included in a separate Maven profile. We recommend running tests with a production build to minimize the chance of development time toolchains affecting test stability. To run the tests using Google Chrome, execute
+### **Prerequisites**  
+Make sure you have the following installed:  
+✅ **Java 17+**  
+✅ **Maven**  
+✅ **Docker** *(optional, for deployment)*  
 
-`mvn verify -Pit,production`
+### **Steps to Run**  
 
-and make sure you have a valid TestBench license installed.
-
-Profile `it` adds the following parameters to run integration tests:
+#### **1️⃣ Clone the Repository**  
 ```sh
--Dwebdriver.chrome.driver=path_to_driver
--Dcom.vaadin.testbench.Parameters.runLocally=chrome
+git clone https://github.com/your-username/vessel-monitoring.git
+cd vessel-monitoring
 ```
 
-If you would like to run a separate test make sure you have added these parameters to VM Options of JUnit run configuration
+#### **2️⃣ Set Up the Database**  
+- Ensure PostgreSQL is running  
+- Create a database: `CREATE DATABASE vessel_tracking;`  
+- Configure database settings in `application.properties`  
 
-### Live Reload (optional)
+#### **3️⃣ Build and Run the Backend**  
+```sh
+cd backend
+mvn clean install
+mvn spring-boot:run
+```
 
-With live reload, you can see the results of your code changes immediately. 
-When you edit your Java code and recompile it, the application changes will be automatically reloaded and the browser is refreshed.
-This is done by leveraging [Spring Boot Developer Tools](https://docs.spring.io/spring-boot/docs/2.1.5.RELEASE/reference/html/using-boot-devtools.html). 
-To be able to see the changes in the browser tab, the page still needs to be reloaded. 
-That can also  be automated via a LiveReload browser extension. 
-One such extension for Google Chrome is [LiveReload](https://chrome.google.com/webstore/detail/livereload/jnihajbhpnppcggbcgedagnkighmdlei). 
-In Firefox, [LiveReload - Web extension](https://addons.mozilla.org/en-US/firefox/addon/livereload-web-extension/) can be used.
-You can find such similar extensions for other major browsers too.
-These extensions add an icon to your browser next to the address bar.
-To enable the extension, you should click that icon after you opened your application. 
+#### **4️⃣ Run the Vaadin Frontend**  
+```sh
+cd frontend
+mvn clean install
+mvn spring-boot:run
+```
 
-You can find more information at [Live Reload in Spring Boot Applications](https://vaadin.com/docs/flow/workflow/tutorial-spring-boot-live-reload.html) document.
+#### **5️⃣ Access the Application**  
+- Open a browser and go to `http://localhost:8080/`  
+- Login with your credentials and explore the vessel tracking dashboard  
 
-## Structure
+---
 
-Vaadin web applications are full-stack and include both client-side and server-side code in the same project.
+## 🛠️ Deployment (Optional)  
 
-| Directory                                  | Description |
-|:-------------------------------------------| :--- |
-| `src/main/frontend/`                       | Client-side source directory |
-| &nbsp;&nbsp;&nbsp;&nbsp;`index.html`       | HTML template |
-| &nbsp;&nbsp;&nbsp;&nbsp;`index.ts`         | Frontend entrypoint |
-| &nbsp;&nbsp;&nbsp;&nbsp;`main-layout.ts`   | Main layout Web Component (optional) |
-| &nbsp;&nbsp;&nbsp;&nbsp;`views/`           | UI views Web Components (TypeScript / HTML) |
-| &nbsp;&nbsp;&nbsp;&nbsp;`styles/`          | Styles directory (CSS) |
-| `src/main/java/<groupId>/`                 | Server-side source directory |
-| &nbsp;&nbsp;&nbsp;&nbsp;`Application.java` | Server entrypoint |
-| &nbsp;&nbsp;&nbsp;&nbsp;`AppShell.java`    | application-shell configuration |
+To run the project using **Docker**, build and run using:  
+```sh
+docker-compose up --build
+```
 
-## Code Formatting
+---
 
-The project includes the Spotless code formatter.
+## 📌 Future Enhancements  
+🔹 Add **Machine Learning models** for predicting vessel movement.  
+🔹 Improve **Oil Spill Detection** using deep learning models.  
+🔹 Implement **real-time notifications** for vessel alerts.  
 
-To use it in IntelliJ, install the [https://plugins.jetbrains.com/plugin/22455-spotless-applier](IntelliJ plugin)
-To use it in VS Code, install the [https://marketplace.visualstudio.com/items?itemName=richardwillis.vscode-spotless-gradle ](VS Code extension)
-To use it from the command line, run `mvn spotless:apply`
+---
 
-## Useful links
+## 📩 Contact  
+For any questions or contributions, feel free to reach out or submit a pull request! 🚀  
 
-- Read the documentation at [vaadin.com/docs](https://vaadin.com/docs).
-- Follow the tutorials at [vaadin.com/tutorials](https://vaadin.com/tutorials).
-- Watch training videos and get certified at [vaadin.com/learn/training](https://vaadin.com/learn/training).
-- Create new projects at [start.vaadin.com](https://start.vaadin.com/).
-- Search UI components and their usage examples at [vaadin.com/components](https://vaadin.com/components).
-- View use case applications that demonstrate Vaadin capabilities at [vaadin.com/examples-and-demos](https://vaadin.com/examples-and-demos).
-- Discover Vaadin's set of CSS utility classes that enable building any UI without custom CSS in the [docs](https://vaadin.com/docs/latest/ds/foundation/utility-classes). 
-- Find a collection of solutions to common use cases in [Vaadin Cookbook](https://cookbook.vaadin.com/).
-- Find Add-ons at [vaadin.com/directory](https://vaadin.com/directory).
-- Ask questions on [Stack Overflow](https://stackoverflow.com/questions/tagged/vaadin) or join our [Discord channel](https://discord.gg/MYFq5RTbBn).
-- Report issues, create pull requests in [GitHub](https://github.com/vaadin/platform).
+---
+
+This **README.md** covers everything from **project details, dependencies, setup, and how to run the project**. Let me know if you want any modifications! 🚢💡
