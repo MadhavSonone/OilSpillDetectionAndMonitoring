@@ -89,12 +89,3 @@ docker-compose up --build
 🔹 Add **Machine Learning models** for predicting vessel movement.  
 🔹 Improve **Oil Spill Detection** using deep learning models.  
 🔹 Implement **real-time notifications** for vessel alerts.  
-
----
-
-## 📩 Contact  
-For any questions or contributions, feel free to reach out or submit a pull request! 🚀  
-
----
-
-This **README.md** covers everything from **project details, dependencies, setup, and how to run the project**. Let me know if you want any modifications! 🚢💡
