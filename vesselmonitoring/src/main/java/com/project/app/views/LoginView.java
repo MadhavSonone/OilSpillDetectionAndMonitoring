@@ -42,7 +42,7 @@ public class LoginView extends VerticalLayout {
         HorizontalLayout others = new HorizontalLayout();
         others.add(forgotPassword);
         others.add(register);
-
+ 
         VerticalLayout formLayout = new VerticalLayout(title, email, password, loginButton, others);
         formLayout.addClassName("login-form");
 
