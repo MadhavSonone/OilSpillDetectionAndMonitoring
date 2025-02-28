@@ -1,8 +1,0 @@
-{
-  "parent": "lumo",
-  "typography": "system",
-  "theme": {
-	"name": "mytheme",
-	"dark" : false
-  }
-}
