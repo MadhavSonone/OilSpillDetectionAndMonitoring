@@ -1,5 +1,7 @@
 package com.project.app.views;
 
+import com.project.app.service.HttpClient;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.Div;
@@ -11,38 +13,38 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
-import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.upload.Upload;
-import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.StreamResource;
-import com.vaadin.flow.server.auth.AnonymousAllowed;
 import com.vaadin.flow.theme.lumo.LumoUtility;
+import com.vaadin.flow.component.upload.Upload;
+import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 
-import java.io.InputStream;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 
 @PageTitle("Image Upload | Vessel Tracking")
 @Route(value = "upload", layout = MainLayout.class)
-@AnonymousAllowed
 public class ImageUploadView extends VerticalLayout {
 
     private MemoryBuffer buffer;
     private Upload upload;
     private Image preview;
-    private Button submitButton;
+    private Button analyzeButton;
     private Div imageContainer;
+    private Div resultContainer;
+    private Paragraph resultText;
 
     public ImageUploadView() {
-        addClassName("upload-view");
         setSizeFull();
         setAlignItems(FlexComponent.Alignment.CENTER);
         setJustifyContentMode(FlexComponent.JustifyContentMode.START);
         setPadding(true);
         setSpacing(true);
 
-        // Create a card container for upload contents
+        // Card container for better UI
         Div card = new Div();
         card.addClassNames(
             LumoUtility.Background.BASE,
@@ -52,162 +54,142 @@ public class ImageUploadView extends VerticalLayout {
             LumoUtility.Width.MEDIUM
         );
 
-
-
         H2 title = new H2("Oil Spill Detection");
-        title.addClassName(LumoUtility.Margin.Top.MEDIUM);
+        title.addClassNames(LumoUtility.Margin.Top.MEDIUM);
 
-        Paragraph description = new Paragraph("Upload satellite or drone Images to check for oil spill.");
-        description.addClassNames(
-            LumoUtility.TextColor.SECONDARY,
-            LumoUtility.Margin.Top.NONE,
-            LumoUtility.Margin.Bottom.MEDIUM
-        );
+        Paragraph description = new Paragraph("Upload an image to analyze for oil spill detection.");
+        description.addClassNames(LumoUtility.TextColor.SECONDARY);
 
-        // Setup upload component
+        // Upload component
         buffer = new MemoryBuffer();
         upload = new Upload(buffer);
         upload.setMaxFiles(1);
-        upload.setDropAllowed(true);
         upload.setAcceptedFileTypes("image/png", "image/jpeg", "image/jpg");
         upload.addClassName(LumoUtility.Width.FULL);
-        
-        // Style the upload component
-        upload.getElement().getStyle().set("box-sizing", "border-box");
-        upload.getElement().getStyle().set("border", "1px dashed var(--lumo-contrast-30pct)");
-        upload.getElement().getStyle().set("border-radius", "var(--lumo-border-radius-m)");
-        upload.getElement().getStyle().set("padding", "var(--lumo-space-m)");
-        upload.getElement().getStyle().set("background-color", "var(--lumo-contrast-5pct)");
 
         // Image preview container
         imageContainer = new Div();
         imageContainer.setVisible(false);
-        imageContainer.addClassNames(
-            LumoUtility.Padding.MEDIUM, 
-            LumoUtility.Border.ALL,
-            LumoUtility.BorderRadius.MEDIUM,
-            LumoUtility.Margin.Vertical.MEDIUM,
-            LumoUtility.Width.FULL
-        );
-        imageContainer.getStyle().set("border-style", "dashed");
-        imageContainer.getStyle().set("border-color", "var(--lumo-contrast-30pct)");
-        imageContainer.getStyle().set("text-align", "center");
-
         preview = new Image();
-        preview.setAlt("Preview image");
+        preview.setAlt("Uploaded Image");
         preview.setMaxHeight("300px");
-        preview.addClassName(LumoUtility.Width.AUTO);
-        
         imageContainer.add(preview);
 
-        // Submit button with loading state
-        submitButton = new Button("Analyze Image");
-        submitButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        submitButton.setIcon(new Icon(VaadinIcon.SEARCH));
-        submitButton.addClassNames(LumoUtility.Width.FULL, LumoUtility.Margin.Top.MEDIUM);
-        submitButton.setEnabled(false);
+        // Analysis result container
+        resultContainer = new Div();
+        resultContainer.setVisible(false);
+        resultText = new Paragraph();
+        resultContainer.add(resultText);
 
-        // Handle successful upload
+        // Analyze button
+        analyzeButton = new Button("Analyze Image", new Icon(VaadinIcon.SEARCH));
+        analyzeButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        analyzeButton.addClassNames(LumoUtility.Width.FULL, LumoUtility.Margin.Top.MEDIUM);
+        analyzeButton.setEnabled(false);
+
+        // Handle file upload
         upload.addSucceededListener(event -> {
+            // Remove previous result container if any
+            resultContainer.setVisible(false);  // Hide the previous result container
+
             String fileName = event.getFileName();
             StreamResource resource = new StreamResource(fileName, () -> buffer.getInputStream());
             preview.setSrc(resource);
             imageContainer.setVisible(true);
-            submitButton.setEnabled(true);
-            
-            Notification notification = Notification.show(
-                "Image uploaded successfully!", 
-                3000, 
-                Notification.Position.BOTTOM_END
-            );
-            notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            analyzeButton.setEnabled(true);
         });
 
-        // Handle failed upload
-        upload.addFailedListener(event -> {
-            Notification notification = Notification.show(
-                "Upload failed: " + event.getReason(), 
-                5000, 
-                Notification.Position.MIDDLE
-            );
-            notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
-        });
-
-        // Handle file clear
+        // Handle file errors
         upload.addFileRejectedListener(event -> {
-            Notification notification = Notification.show(
-                "File rejected: " + event.getErrorMessage(), 
-                5000, 
-                Notification.Position.MIDDLE
-            );
-            notification.addThemeVariants(NotificationVariant.LUMO_WARNING);
+            Notification.show("File rejected: " + event.getErrorMessage(), 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
         });
 
-        // Submit button click listener
-        submitButton.addClickListener(event -> {
-            submitButton.setEnabled(false);
-            submitButton.setText("Analyzing...");
-            submitButton.setIcon(new Icon(VaadinIcon.HOURGLASS));
-
-            // Simulate processing delay
-            submitButton.getUI().ifPresent(ui -> {
-                ui.push();
-                try {
-                    // Simulate processing time
-                    Thread.sleep(2000);
-                    
-                    InputStream fileData = buffer.getInputStream();
-                    String fileName = buffer.getFileName();
-                    
-                    // TODO: Send fileData to your oil spill detection model
-                    
-                    ui.access(() -> {
-                        Notification notification = Notification.show(
-                            "Analysis complete! Processing results for " + fileName, 
-                            5000, 
-                            Notification.Position.BOTTOM_END
-                        );
-                        notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                        
-                        submitButton.setText("Analyze Image");
-                        submitButton.setIcon(new Icon(VaadinIcon.SEARCH));
-                        submitButton.setEnabled(true);
-                        
-                        // Navigate to results page (uncomment when you have a results view)
-                        // ui.navigate(ResultsView.class, fileName);
-                    });
-                } catch (InterruptedException e) {
-                    ui.access(() -> {
-                        Notification notification = Notification.show(
-                            "Error processing image", 
-                            3000, 
-                            Notification.Position.MIDDLE
-                        );
-                        notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
-                        
-                        submitButton.setText("Analyze Image");
-                        submitButton.setIcon(new Icon(VaadinIcon.SEARCH));
-                        submitButton.setEnabled(true);
-                    });
-                }
-            });
-        });
+        // Analyze image when button is clicked
+        analyzeButton.addClickListener(e -> analyzeImage());
 
         // Help text
         Paragraph helpText = new Paragraph("Supported formats: JPEG, PNG • Max size: 10MB");
         helpText.addClassNames(LumoUtility.TextColor.SECONDARY, LumoUtility.FontSize.SMALL, LumoUtility.TextAlignment.CENTER);
 
         // Add components to card
-        card.add(
-            title,
-            description,
-            upload,
-            imageContainer,
-            submitButton,
-            helpText
-        );
-
-        // Add card to main layout
+        card.add(title, description, upload, imageContainer, analyzeButton, resultContainer, helpText);
         add(card);
+    }
+
+    private void analyzeImage() {
+        // Disable button and clear previous result
+        analyzeButton.setEnabled(false);
+        analyzeButton.setText("Analyzing...");
+        analyzeButton.setIcon(new Icon(VaadinIcon.SPINNER));
+
+        try {
+            // Simulating input file stream
+            InputStream fileData = buffer.getInputStream();
+            String fileName = buffer.getFileName();
+            String uploadDir = "Uploads"; // Local directory
+            new File(uploadDir).mkdirs();
+
+            File uploadedFile = new File(uploadDir, fileName);
+            Files.copy(fileData, uploadedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+
+            // Send file to backend and get response
+            String response = HttpClient.postFile("http://localhost:9090/api/analyze/upload", uploadedFile.getAbsolutePath());
+            System.out.println("Backend Response: " + response);  // Logging backend response
+
+            // Check if the response is valid
+            if (response != null && !response.isEmpty()) {
+                String originalFileName = fileName.substring(0, fileName.lastIndexOf('.'));
+                String segmentedImageName = originalFileName + "_segmented.jpg";
+                String segmentedImagePath = "Outputs" + File.separator + segmentedImageName;
+
+                File segmentedFile = new File(segmentedImagePath);
+
+                // Check if segmented image file exists
+                if (segmentedFile.exists()) {
+                    // Create resource for the segmented image
+                    StreamResource segmentedImageResource = new StreamResource(segmentedImageName, () -> {
+                        try {
+                            return new FileInputStream(segmentedImagePath);
+                        } catch (FileNotFoundException e) {
+                            e.printStackTrace();
+                            return null;
+                        }
+                    });
+
+                    Image segmentedImage = new Image(segmentedImageResource, "Segmented Image");
+                    segmentedImage.setMaxWidth("500px");
+
+                    // Clear previous results
+                    resultContainer.removeAll();
+
+                    // Add the image to the result container
+                    resultContainer.add(segmentedImage);
+                    resultContainer.setVisible(true);
+                    resultText.setText("Analysis Result: Segmented Image Displayed");
+
+                    // Show success notification
+                    Notification.show("Analysis complete!", 3000, Notification.Position.BOTTOM_END)
+                            .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                } else {
+                    // If segmented image does not exist, show error
+                    Notification.show("Segmented image not found.", 3000, Notification.Position.MIDDLE)
+                            .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                }
+            } else {
+                // If backend response is empty or null, show error
+                Notification.show("Analysis failed, please try again.", 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        } catch (Exception ex) {
+            // If any error occurs during processing, show error
+            Notification.show("Error during analysis: " + ex.getMessage(), 5000, Notification.Position.MIDDLE)
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        } finally {
+            // Reset analyze button
+            analyzeButton.setText("Analyze Image");
+            analyzeButton.setIcon(new Icon(VaadinIcon.SEARCH));
+            analyzeButton.setEnabled(true);
+        }
     }
 }

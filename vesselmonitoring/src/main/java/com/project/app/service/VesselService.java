@@ -11,9 +11,22 @@ import java.util.List;
 public class VesselService {
 
     @Autowired
-    private VesselDataRepository latestAisDataRepository;
+    private VesselDataRepository vesselRepository;
 
+
+    // Fetch all vessels (Admin only)
     public List<Vessel> getAllVessels() {
-        return latestAisDataRepository.findAll();
+        return vesselRepository.findAll();  // Use findAll to fetch all vessel records
+    }
+    
+    public Vessel updateVesselStatus(String mmsi, String status) {
+        Vessel vessel = vesselRepository.findByMmsi(mmsi);
+
+        if (vessel != null) {
+            vessel.setStatus(status);  // Set the new status
+            return vesselRepository.save(vessel); // Save updated vessel
+        } else {
+            throw new RuntimeException("Vessel not found for MMSI: " + mmsi);
+        }
     }
 }
