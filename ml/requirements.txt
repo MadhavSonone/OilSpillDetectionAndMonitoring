@@ -1,0 +1,7 @@
+opencv-python
+segmentation-models-pytorch 
+albumentations
+ipykernel
+scikit-learn
+matplotlib
+transformers

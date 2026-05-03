@@ -1,0 +1,254 @@
+critic this method for oilspill segmentation 
+
+from PIL import Image
+import numpy as np
+from collections import Counter
+
+# Load the RGB mask image
+image = Image.open("/kaggle/input/oil-spill/oil-spill/test/labels/img_0061.png").convert("RGB")
+image_np = np.array(image)
+
+# Reshape the image array to a list of RGB tuples
+pixels = image_np.reshape(-1, 3)
+pixels_tuples = [tuple(pixel) for pixel in pixels]
+
+# Count frequency of each color
+color_counts = Counter(pixels_tuples)
+
+# Print top N most common colors
+for color, count in color_counts.most_common():
+    print(f"Color {color} appears {count} times")
+
+!pip install -q segmentation-models-pytorch
+
+import os
+import numpy as np
+import cv2
+from PIL import Image
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+import segmentation_models_pytorch as smp
+from sklearn.metrics import accuracy_score, jaccard_score
+import matplotlib.pyplot as plt
+
+# Paths and config
+TRAIN_IMG_DIR = "/kaggle/input/oil-spill/oil-spill/train/images/"
+TRAIN_MASK_DIR = "/kaggle/input/oil-spill/oil-spill/train/labels/"
+TEST_IMG_DIR = "/kaggle/input/oil-spill/oil-spill/test/images/"
+TEST_MASK_DIR = "/kaggle/input/oil-spill/oil-spill/test/labels/"
+IMG_SIZE = 512
+BATCH_SIZE = 8
+EPOCHS = 25
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+COLOR_MAPPING = {
+    (0, 255, 255): 1,   # Oil spills
+    (255, 0, 0): 2,     # Look-alikes
+    (153, 76, 0): 3,   # Ships
+    (0, 153, 0): 4,     # Land
+    (0, 0, 0): 0        # Sea
+}
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device:", device)
+
+def rgb_to_class(mask):
+    h, w, _ = mask.shape
+    class_mask = np.zeros((h, w), dtype=np.int64)
+    for color, label in COLOR_MAPPING.items():
+        mask_match = np.all(mask == color, axis=-1)
+        class_mask[mask_match] = label
+    return class_mask
+
+def get_transforms():
+    return A.Compose([
+        A.Resize(IMG_SIZE, IMG_SIZE),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.RandomRotate90(p=0.5),
+        A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.1, rotate_limit=30, p=0.5),
+        A.GaussNoise(p=0.2),
+        A.GridDistortion(p=0.3),
+        A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+        ToTensorV2()
+    ])
+
+class OilSpillDataset(Dataset):
+    def __init__(self, image_dir, mask_dir, transforms=None):
+        self.image_dir = image_dir
+        self.mask_dir = mask_dir
+        self.transforms = transforms
+
+        self.image_filenames = sorted([
+            f for f in os.listdir(image_dir) if f.endswith(('.png', '.jpg', '.tif'))
+        ])
+        self.mask_filenames = sorted([
+            f for f in os.listdir(mask_dir) if f.endswith(('.png', '.jpg', '.tif'))
+        ])
+
+        assert len(self.image_filenames) == len(self.mask_filenames), "Mismatch between images and masks"
+
+    def __len__(self):
+        return len(self.image_filenames)
+
+    def __getitem__(self, idx):
+        img_name = self.image_filenames[idx]
+        mask_name = self.mask_filenames[idx]
+        img_path = os.path.join(self.image_dir, img_name)
+        mask_path = os.path.join(self.mask_dir, mask_name)
+
+        image = np.array(Image.open(img_path).convert("RGB"))
+        mask = np.array(Image.open(mask_path).convert("RGB"))  # Assumes RGB mask
+        mask_labels = rgb_to_class(mask)  # Convert RGB to class index map
+
+        if self.transforms:
+            augmented = self.transforms(image=image, mask=mask_labels)
+            image = augmented["image"]
+            mask_labels = augmented["mask"]
+
+        return image, mask_labels
+
+def train(model, loader, optimizer, criterion, device):
+    model.train()
+    epoch_loss = 0.0
+    for images, masks in loader:
+        images, masks = images.to(device), masks.to(device).long()
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, masks)
+        loss.backward()
+        optimizer.step()
+        epoch_loss += loss.item()
+    return epoch_loss / len(loader)
+
+def validate(model, loader, criterion, device):
+    model.eval()
+    val_loss = 0.0
+    with torch.no_grad():
+        for images, masks in loader:
+            images, masks = images.to(device), masks.to(device).long()
+            outputs = model(images)
+            loss = criterion(outputs, masks)
+            val_loss += loss.item()
+    return val_loss / len(loader)
+
+def evaluate_model(model, loader, device):
+    model.eval()
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for images, masks in loader:
+            images = images.to(device)
+            masks = masks.to(device).long()
+            outputs = model(images)
+            preds = torch.argmax(outputs, dim=1).cpu().numpy()
+            labels = masks.cpu().numpy()
+            all_preds.extend(preds.flatten())
+            all_labels.extend(labels.flatten())
+    acc = accuracy_score(all_labels, all_preds)
+    iou = jaccard_score(all_labels, all_preds, average='macro')
+    print(f"Accuracy: {acc:.4f}, IoU Score: {iou:.4f}")
+
+def dice_coefficient(y_true, y_pred, smooth=1e-6):
+    dice_scores = []
+    for class_id in range(1, 5):
+        true_class = (y_true == class_id).astype(np.float32)
+        pred_class = (y_pred == class_id).astype(np.float32)
+        intersection = np.sum(true_class * pred_class)
+        union = np.sum(true_class) + np.sum(pred_class)
+        dice = (2.0 * intersection + smooth) / (union + smooth)
+        dice_scores.append(dice)
+    return np.mean(dice_scores), dice_scores
+
+def evaluate_model_with_dice(model, loader, device):
+    model.eval()
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for images, masks in loader:
+            images = images.to(device)
+            masks = masks.to(device).long()
+            outputs = model(images)
+            preds = torch.argmax(outputs, dim=1).cpu().numpy()
+            labels = masks.cpu().numpy()
+            all_preds.extend(preds)
+            all_labels.extend(labels)
+    all_preds = np.array(all_preds)
+    all_labels = np.array(all_labels)
+    mean_dice, dice_per_class = dice_coefficient(all_labels, all_preds)
+    print(f"\n✅ Mean Dice Score: {mean_dice:.4f}")
+    for name, score in zip(["Oil", "Look-alikes", "Ships", "Land"], dice_per_class):
+        print(f"   {name:<15}: {score:.4f}")
+train_dataset = OilSpillDataset(TRAIN_IMG_DIR, TRAIN_MASK_DIR, get_transforms())
+test_dataset = OilSpillDataset(TEST_IMG_DIR, TEST_MASK_DIR, get_transforms())
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
+test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
+
+model = smp.DeepLabV3Plus(
+    encoder_name="resnet101",
+    encoder_weights="imagenet",
+    classes=5,
+    activation=None
+).to(DEVICE)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+criterion = nn.CrossEntropyLoss()
+
+for epoch in range(EPOCHS):
+    train_loss = train(model, train_loader, optimizer, criterion, DEVICE)
+    val_loss = validate(model, test_loader, criterion, DEVICE)
+    print(f"Epoch {epoch+1}/{EPOCHS}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+
+# Evaluation
+evaluate_model(model, test_loader, DEVICE)
+evaluate_model_with_dice(model, test_loader, DEVICE)
+from PIL import Image
+import matplotlib.pyplot as plt
+
+transform = A.Compose([
+    A.Resize(256, 256),  # adjust based on training size
+    A.Normalize(mean=(0.0, 0.0, 0.0), std=(1.0, 1.0, 1.0)),
+    ToTensorV2()
+])
+
+# Function to evaluate a single image
+def evaluate_single_image(image_path, model, device):
+    model.eval()
+    
+    # Load and preprocess image
+    image = np.array(Image.open(image_path).convert("RGB"))
+    augmented = transform(image=image)
+    input_tensor = augmented['image'].unsqueeze(0).to(device)
+
+    # Predict
+    with torch.no_grad():
+        output = model(input_tensor)
+        pred_mask = torch.argmax(output, dim=1).squeeze(0).cpu().numpy()
+
+    return image, pred_mask
+    
+def visualize_prediction(image, mask):
+    plt.figure(figsize=(10, 5))
+    plt.subplot(1, 2, 1)
+    plt.imshow(image)
+    plt.title("Input Image")
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(mask, cmap="jet")
+    plt.title("Predicted Mask")
+    plt.show()
+
+
+image_path = "/kaggle/input/oil-spill/oil-spill/test/images/img_0024.jpg"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
+
+image, predicted_mask = evaluate_single_image(image_path, model, device)
+visualize_prediction(image, predicted_mask)
+
+✅ Mean Dice Score: 0.5134
+   Oil            : 0.4480
+   Look-alikes    : 0.5026
+   Ships          : 0.2162
+   Land           : 0.8867
+

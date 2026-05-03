@@ -1,1 +1,20 @@
+# Ignore metadata directory
 /.metadata/
+
+# Ignore data directory (contains raw/processed AIS data)
+*/data/
+./data/
+# Ignore .env files in both backend and frontend
+backend/.env
+frontend/.env
+
+# Ignore processed data directories in both backend and frontend
+backend/data
+frontend/data
+
+*/__pycache__/
+*/.venv/
+*/venv/
+*/node_modules/
+*/build/
+*/.angular/

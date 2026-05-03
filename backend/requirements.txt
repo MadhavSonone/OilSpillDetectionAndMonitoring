@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+psycopg2-binary
+geoalchemy2
+confluent-kafka
+pyspark
+tensorflow
+opencv-python-headless
+python-multipart
+python-dotenv
+httpx
+websockets

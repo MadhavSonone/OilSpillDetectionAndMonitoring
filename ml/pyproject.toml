@@ -1,0 +1,15 @@
+[project]
+name = "ml"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "albumentations>=2.0.8",
+    "ipykernel>=7.2.0",
+    "matplotlib>=3.10.9",
+    "opencv-python>=4.13.0.92",
+    "scikit-learn>=1.8.0",
+    "segmentation-models-pytorch>=0.5.0",
+    "transformers>=5.7.0",
+]
